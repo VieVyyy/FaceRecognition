@@ -7,15 +7,22 @@
 <body>
     <div>
         <h1>Face Recognition with RetinaFace and MobileFace Net</h1>
-        <button id = "startButton" onclick = "startStream()">Start stream</button>
-        <button id = "stopButton" onclick = "stopStream()" disabled>Stop stream</button>
+
+        <div id = "controls">
+            <button id = "startButton" onclick = "startStream()">Start stream</button>
+            <button id = "stopButton" onclick = "stopStream()" disabled>Stop stream</button>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <button><a href="/add">Add new face</a></button>
+        </div>
+
         <br><br>
         <img id="video"/>
-        <br><br>
     </div>
 
     <script src = "https://cdn.socket.io/3.1.0/socket.io.min.js"></script>
 
-    <script src = "{{ url_for('static', filename='js/scripts.js') }}"></script>
+    <script src = "{{ url_for('static', filename='js/recognize.js') }}"></script>
 </body>
 </html>
