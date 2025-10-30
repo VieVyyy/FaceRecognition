@@ -1,48 +1,3 @@
-# import torch
-# import cv2
-# from utils.image_utils import *
-# from src.retinaface_detector import RetinaFaceDetector
-# from src.face_recognizer import FaceRecognizer
-# from src.faiss_index import FaceIndex
-# import os
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-# detector_model = "models/RetinaFaceNet.onnx"
-# embedder_model = "models/MobileFaceNet.onnx"
-# IMG_SIZE = (640, 640)
-# detector = RetinaFaceDetector(detector_model, device, input_size=IMG_SIZE)
-
-# recognizer = FaceRecognizer(detector_model, embedder_model, device)
-# faiss_index = FaceIndex(dim=128, index_path="face_data/emb_face/face_index.bin")
-
-# # # --- Thêm khuôn mặt mới ---
-# # embeddings = recognizer.getEmbeddings("face_data/org_face/vy_img.jpg")
-# # for emb in embeddings:
-# #     faiss_index.add(emb, "Vy")
-# # faiss_index.saveIndex()
-
-# # --- Nhận diện khuôn mặt mới ---
-# test_embeddings = recognizer.getEmbeddings("face_data/test_images/VY/vy_1.jpg")
-# for emb in test_embeddings:
-#     labels, dists = faiss_index.search(emb)
-#     print(f"Nhận diện: {labels[0]} (distance={dists[0]:.4f})")
-
-# test_img_dir = "face_data/test_images/"
-# count = 0
-# for folder in os.listdir(test_img_dir):
-#     folder_path = os.path.join(test_img_dir, folder)
-#     if os.path.isdir(folder_path):
-#         for filename in os.listdir(folder_path):
-#             if filename.endswith(".jpg") or filename.endswith(".png"):
-#                 img_path = os.path.join(folder_path, filename)
-#                 embeddings = recognizer.getEmbeddings(img_path)
-#                 for emb in embeddings:
-#                     labels, dists = faiss_index.search(emb)
-#                     print(f"Ảnh: {filename} - Nhận diện: {labels[0]} (distance={dists[0]:.4f})")
-#                     if labels[0] == folder.lower():
-#                         count += 1
-# print(f"Accuracy: {count}/{sum(len(os.listdir(os.path.join(test_img_dir, f))) for f in os.listdir(test_img_dir) if os.path.isdir(os.path.join(test_img_dir, f)))} = {count / sum(len(os.listdir(os.path.join(test_img_dir, f))) for f in os.listdir(test_img_dir) if os.path.isdir(os.path.join(test_img_dir, f))):.4f}")
-
 import os
 import cv2
 import torch
@@ -51,19 +6,24 @@ from src.face_recognizer import FaceRecognizer
 from src.faiss_index import FaceIndex
 from utils.image_utils import *
 
-# ==============================
+from flask import Flask, render_template
+from flask_socketio import SocketIO
+import base64
+
+# Khai báo ứng dụng Flask và SocketIO
+app = Flask(__name__)
+socketio = SocketIO(app)
+
 # Cấu hình
-# ==============================
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 FACE_INDEX_PATH = "face_data/emb_face/face_index.bin"
-# THRESHOLD = 1.4  # Ngưỡng khoảng cách để xác định Unknown (càng nhỏ càng chặt)
+THRESHOLD = 1.3  # Ngưỡng khoảng cách để xác định Unknown (càng nhỏ càng chặt)
+is_streaming = False # Biến trạng thái luồng video
 
 detector_model = "models/RetinaFaceNet.onnx"
 embedder_model = "models/MobileFaceNet.onnx"
 
-# ==============================
 # Khởi tạo nhận diện và index
-# ==============================
 recognizer = FaceRecognizer(detector_model, embedder_model, device=DEVICE)
 faiss_index = FaceIndex(dim=128, index_path=FACE_INDEX_PATH)
 
@@ -73,53 +33,85 @@ if not os.path.exists(FACE_INDEX_PATH):
     faiss_index.create(org_img_dir, recognizer)
 
 print("Face recognizer and FAISS index loaded.")
-THRESHOLD = faiss_index.suggestOptimalThreshold()
-# ==============================
 
+def encodeFrameToBase64(frame):
+    _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 30])
+    frame_base64 = base64.b64encode(buffer).decode('utf-8')
+    return frame_base64
 
+@socketio.on('start_stream')
+def handleStartStream():
+    global is_streaming
+    if not is_streaming:
+        print("Client kết nối real-time face recognition.")
+        is_streaming = True
+        socketio.start_background_task(target=streamVideo)
+    else:
+        print("Stream đang chạy!")
 
-# Bắt đầu camera
-# ==============================
-cap = cv2.VideoCapture(0)
-if not cap.isOpened():
-    print("❌ Không thể mở camera!")
-    exit()
+@socketio.on('stop_stream')
+def handleStopStream():
+    global is_streaming
+    if is_streaming:
+        print("Client ngắt kết nối real-time face recognition.")
+        is_streaming = False
+    else:
+        print("Stream chưa chạy!")
 
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        print("❌ Không đọc được khung hình!")
-        break
+def streamVideo(threshold=1.3):
+    global is_streaming 
 
-    # Phát hiện khuôn mặt và trích xuất embeddings
+    cap = cv2.VideoCapture(0)
+    frame_id = 0
+    if not cap.isOpened():
+        print("Không thể mở camera!")
+        is_streaming = False
+        socketio.emit('stream_error', {'message': 'Không thể mở camera!'})
+        return
+    
     try:
-        aligned_faces, bboxes, landms, _ = recognizer.detectAndAlign(frame)
+        while is_streaming:
+            success, frame = cap.read()
+            if not success:
+                print("Không đọc được khung hình!")
+                break
 
-        for face, bbox, landm in zip(aligned_faces, bboxes, landms):
-            emb = recognizer.getEmbeddingFromAligned(face)
-            if emb is not None:
-                # Tìm kiếm trong FAISS index
-                labels, distances = faiss_index.search(emb, top_k=1)
-                label = labels[0]
-                distance = distances[0]
+            frame_id += 1
+            aligned_faces, bboxes, _, _ = recognizer.detectAndAlign(frame)
+            results = []
 
-                if distance > THRESHOLD:
-                    label = "Unknown"
+            for face, bbox in zip(aligned_faces, bboxes):
+                emb = recognizer.getEmbeddingFromAligned(face)
+                if emb is not None:
+                    labels, distances = faiss_index.search(emb, top_k=1)
+                    label = labels[0]
+                    distance = distances[0]
 
-                # Vẽ khung và nhãn
-                x1, y1, x2, y2 = map(int, bbox[:4])
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
-                cv2.putText(frame, f"{label} ({distance:.2f})", (x1, y1 - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
-    except Exception as e:
-        print("⚠️ Lỗi phát hiện:", e)
+                    if distance > threshold:
+                        label = "Unknown"
 
-    # Hiển thị khung hình
-    cv2.imshow("Real-time Face Recognition", frame)
+                    x1, y1, x2, y2 = map(int, bbox[:4])
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                    cv2.putText(frame, f"{label} ({distance:.2f})", (x1, y1 - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
 
-    # Nhấn 'q' để thoát
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+            frame_base64 = encodeFrameToBase64(frame)
+            socketio.emit('video_frame', {'image': frame_base64})
+            socketio.sleep(0.07)  # Giới hạn tốc độ khung hình
 
-cap.release()
-cv2.destroyAllWindows()
+            if frame_id % 15 == 0:
+                del frame, aligned_faces, bboxes, results
+                torch.cuda.empty_cache() # Giải phóng bộ nhớ GPU định kỳ
+
+    finally:
+        print("Dừng stream video.")
+        cap.release()
+        is_streaming = False
+        socketio.emit('stream_stopped', {'message': 'Stream đã dừng.'})
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+        
+if __name__ == '__main__':
+    socketio.run(app, debug=False)

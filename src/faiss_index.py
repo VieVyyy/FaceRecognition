@@ -87,9 +87,15 @@ class FaceIndex:
             else:
                 inter_dists.append(distances[i, j])
 
-        if not intra_dists or not inter_dists:
-            print("⚠️ Cần ít nhất 2 nhãn khác nhau để ước lượng threshold.")
-            return None
+        # if not intra_dists or not inter_dists:
+        #     print("⚠️ Cần ít nhất 2 nhãn khác nhau để ước lượng threshold.")
+        #     return None
+        if not intra_dists:
+            mean_inter = np.mean(inter_dists)
+            threshold = 0.9 * mean_inter   # chọn một tỷ lệ thấp hơn khoảng cách trung bình giữa các lớp
+            print(f"⚠️ Không có intra-class, tạm dùng threshold = {threshold:.4f}")
+            self.threshold = threshold
+            return threshold
 
         mean_intra = np.mean(intra_dists)
         mean_inter = np.mean(inter_dists)
