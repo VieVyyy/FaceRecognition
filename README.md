@@ -24,7 +24,7 @@ env/Scripts/activate
 python main.py
 ```
 
-## Cách tính năng
+## Các tính năng
 ### Nhận diện khuôn mặt
 
 Click nút `Start stream` để khởi động camera bắt đầu nhận diện.
