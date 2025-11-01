@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add New Face</title>
+    <link rel = "stylesheet" href = "{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div>
+        <h1>Add a New Face</h1>
+
+        <video id = "cameraFeed" width = "500" autoplay playsinline></video>
+        <canvas id = "captureCanvas" width = "500" style="display: none;"></canvas>
+        
+        <div id = "addFaceSection">
+            <input type = "text" id = "faceLabel" placeholder = "Enter name"/>
+            <br><br>
+            <button id = "addFaceButton">Capture & Add Face</button>
+            <p id = "statusMessage"></p>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <a href="/">Back to Live Recognition</a>
+        </div>
+    </div>
+    
+    <script src="https://cdn.socket.io/3.1.0/socket.io.min.js"></script>
+    <script src = "{{ url_for('static', filename='js/add_face.js') }}"></script>    
+</body>
+</html>

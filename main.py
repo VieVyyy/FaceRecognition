@@ -60,7 +60,7 @@ def handleStopStream():
     else:
         print("Stream chưa chạy!")
 
-def streamVideo(threshold=1.3):
+def streamVideo(threshold=1.1):
     global is_streaming 
 
     cap = cv2.VideoCapture(0)
