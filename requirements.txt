@@ -1,0 +1,9 @@
+--index-url https://download.pytorch.org/whl/cu121
+torch
+flask
+flask_socketio
+scikit-learn
+onnxruntime-gpu  # <-- Đã thay đổi
+numpy
+opencv-python
+faiss-cpu
