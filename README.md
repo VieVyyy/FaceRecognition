@@ -1,6 +1,7 @@
 # Mô hình Face Recognition
 
 ## Tổng quan
+
 Mô hình Face Recognition đơn giản sử dụng các pre-trained model
 
 - Face detector: [Pre-trained model RetinaFace](https://github.com/biubug6/Pytorch_Retinaface.git)
@@ -9,13 +10,22 @@ Mô hình Face Recognition đơn giản sử dụng các pre-trained model
 - Web demo: Flask
 
 ## Cách chạy trên máy
+
 1. Clone repos
 
-2. Activate môi trường
+```
+git clone https://github.com/VieVyyy/FaceRecognition.git
+```
+
+2. Cài đặt môi trường
+
+Phiên bản Python: `3.11.9`
 
 ```
 cd FaceRecognition
-env/Scripts/activate
+python -m venv env
+env\Scripts\activate
+pip install -r requirements.txt
 ```
 
 3. Chạy Flask
